@@ -28,6 +28,7 @@ var (
 	netPrivateClassC = mustParseCIDR("192.168.0.0/16")
 	netTestNet       = mustParseCIDR("192.0.2.0/24")
 	net6To4Relay     = mustParseCIDR("192.88.99.0/24")
+	netISPShared     = mustParseCIDR("100.64.0.0/10")
 )
 
 func init() {
@@ -42,7 +43,7 @@ func safeAddr(ctx context.Context, resolver *net.Resolver, hostport string) (str
 
 	ip := net.ParseIP(host)
 	if ip != nil {
-		if ip.To4() != nil && isBadIPv4(ip) {
+		if isBadIPAddress(ip) {
 			return "", fmt.Errorf("bad ip is detected: %v", ip)
 		}
 		return net.JoinHostPort(ip.String(), port), nil
@@ -61,7 +62,7 @@ func safeAddr(ctx context.Context, resolver *net.Resolver, hostport string) (str
 		return "", err
 	}
 	for _, addr := range addrs {
-		if addr.IP.To4() != nil && isBadIPv4(addr.IP) {
+		if isBadIPAddress(addr.IP) {
 			return "", fmt.Errorf("bad ip is detected: %v", addr.IP)
 		}
 	}
@@ -116,20 +117,51 @@ func isBadHost(host string) bool {
 	if regHasSpace.MatchString(host) {
 		return true
 	}
+	ipList, _ := net.LookupIP(host)
+	// if err != nil {
+	// 	return true
+	// }
+
+	for i := 0; i < len(ipList); i++ {
+		if isBadIPAddress(ipList[i]) {
+			return true
+		}
+	}
 
 	return false
 }
 
-func isBadIPv4(ip net.IP) bool {
+func isBadIPAddress(ip net.IP) bool {
+	isbadv4, _ := isBadIPv4(ip)
+	isbadv6, _ := isBadIPv6(ip)
+	if isbadv4 || isbadv6 {
+		return true
+	}
+	return false
+}
+
+func isBadIPv4(ip net.IP) (bool, error) {
 	if ip.To4() == nil {
-		panic("cannot be called for IPv6")
+		return false, fmt.Errorf("not IPv4 address")
 	}
 
 	if ip.Equal(net.IPv4bcast) || !ip.IsGlobalUnicast() ||
 		netPrivateClassA.Contains(ip) || netPrivateClassB.Contains(ip) || netPrivateClassC.Contains(ip) ||
-		netTestNet.Contains(ip) || net6To4Relay.Contains(ip) {
-		return true
+		netTestNet.Contains(ip) || net6To4Relay.Contains(ip) || netISPShared.Contains(ip) {
+		return true, nil
 	}
 
-	return false
+	return false, nil
+}
+
+func isBadIPv6(ip net.IP) (bool, error) {
+	if ip.To16() == nil {
+		return false, fmt.Errorf("not IPv6 address")
+	}
+
+	if !ip.IsGlobalUnicast() {
+		return true, nil
+	}
+
+	return false, nil
 }
