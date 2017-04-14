@@ -1,7 +1,6 @@
 package paranoidhttp
 
 import (
-	"fmt"
 	"net"
 	"testing"
 )
@@ -9,8 +8,12 @@ import (
 func TestRequest(t *testing.T) {
 	_, err := DefaultClient.Get("http://ipv4.google.com")
 	if err != nil {
-		fmt.Printf("%s\r\n", err.Error())
 		t.Error("The request with an ordinal url should be successful")
+	}
+
+	_, err = DefaultClient.Get("http://ipv6.google.com")
+	if err != nil {
+		t.Log("Warning: If your network supports IPv6, this request should be successful")
 	}
 
 	_, err = DefaultClient.Get("http://localhost")
@@ -36,7 +39,8 @@ func TestIsBadHost(t *testing.T) {
 
 	notBadHosts := []string{
 		"www.hatena.ne.jp",
-		"www.google.com",
+		"ipv4.google.com",
+		"ipv6.google.com",
 		"xn--t8jx73hngb.jp",
 	}
 
