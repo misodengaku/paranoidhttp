@@ -26,7 +26,10 @@ var (
 	netPrivateClassA = mustParseCIDR("10.0.0.0/8")
 	netPrivateClassB = mustParseCIDR("172.16.0.0/12")
 	netPrivateClassC = mustParseCIDR("192.168.0.0/16")
+	netBenchmark     = mustParseCIDR("198.18.0.0/15")
 	netTestNet       = mustParseCIDR("192.0.2.0/24")
+	netTestNet2      = mustParseCIDR("198.51.100.0/24")
+	netTestNet3      = mustParseCIDR("203.0.113.0/24")
 	net6To4Relay     = mustParseCIDR("192.88.99.0/24")
 	netISPShared     = mustParseCIDR("100.64.0.0/10")
 )
@@ -147,7 +150,8 @@ func isBadIPv4(ip net.IP) (bool, error) {
 
 	if ip.Equal(net.IPv4bcast) || !ip.IsGlobalUnicast() ||
 		netPrivateClassA.Contains(ip) || netPrivateClassB.Contains(ip) || netPrivateClassC.Contains(ip) ||
-		netTestNet.Contains(ip) || net6To4Relay.Contains(ip) || netISPShared.Contains(ip) {
+		netTestNet.Contains(ip) || netTestNet2.Contains(ip) || netTestNet3.Contains(ip) ||
+		net6To4Relay.Contains(ip) || netISPShared.Contains(ip) || netBenchmark.Contains(ip) {
 		return true, nil
 	}
 
