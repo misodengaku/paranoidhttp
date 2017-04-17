@@ -16,6 +16,11 @@ func TestRequest(t *testing.T) {
 		t.Log("Warning: If your network supports IPv6, this request should be successful")
 	}
 
+	_, err = DefaultClient.Get("http://redirect.test.oomurosakura.co") // redirect to 127.0.0.1
+	if err == nil {
+		t.Error("The request with an ordinal url should be successful")
+	}
+
 	_, err = DefaultClient.Get("http://localhost")
 	if err == nil {
 		t.Errorf("The request for localhost should be fail")

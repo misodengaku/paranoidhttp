@@ -107,6 +107,9 @@ func NewClient() (*http.Client, *http.Transport, *net.Dialer) {
 	return &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return fmt.Errorf("redirect attempted")
+		},
 	}, transport, dialer
 }
 
