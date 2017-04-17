@@ -11,14 +11,19 @@ func TestParanoidGet(t *testing.T) {
 		t.Error("The request with an ordinal url should be successful: ", err)
 	}
 
-	_, err = ParanoidGet("http://ipv6.google.com")
-	if err != nil {
-		t.Log("Warning: If your network supports IPv6, this request should be successful", err)
-	}
+	// _, err = ParanoidGet("http://ipv6.google.com")
+	// if err != nil {
+	// 	t.Log("Warning: If your network supports IPv6, this request should be successful", err)
+	// }
 
 	_, err = ParanoidGet("http://redirect.test.oomurosakura.co") // redirect to 127.0.0.1
 	if err == nil {
-		t.Error("The request with an ordinal url should be fail")
+		t.Error("The request for bad host should be fail")
+	}
+
+	_, err = ParanoidGet("http://localv4.test.oomurosakura.co") // redirect to 127.0.0.1
+	if err == nil {
+		t.Error("The request for bad host should be fail")
 	}
 
 	_, err = ParanoidGet("http://localhost")

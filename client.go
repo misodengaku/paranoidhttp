@@ -117,7 +117,7 @@ func NewClient() (*http.Client, *http.Transport, *net.Dialer) {
 	}, transport, dialer
 }
 
-func ParanoidGet(urlStr string) (resp *http.Response, err error) {
+func ParanoidGet(urlStr string) (*http.Response, error) {
 	url, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
@@ -128,13 +128,11 @@ func ParanoidGet(urlStr string) (resp *http.Response, err error) {
 	if ipaddr == nil {
 		// ホスト名がIPアドレスじゃないとき
 		isbad, ip := IsBadHost(url.Host)
-		fmt.Println("aaa", url.Host, ip)
 		if isbad {
 			return nil, fmt.Errorf("Bad host detected.")
 		}
 
 		url.Host = ip.String()
-
 	} else {
 		isbad, _ := isBadIPAddress(ipaddr)
 		if isbad {
@@ -145,11 +143,17 @@ func ParanoidGet(urlStr string) (resp *http.Response, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if ipaddr != nil {
-		req.Header.Set("Host", hostname)
+
+	// IPアドレスじゃなかったのでHostヘッダ要る
+	if ipaddr == nil {
+		// req.Host
+		// req.Header.Set("Host", hostname)
+		req.Host = hostname
 	}
 
-	return DefaultClient.Do(req)
+	resp, err := DefaultClient.Do(req)
+
+	return resp, err
 }
 
 var regLocalhost = regexp.MustCompile("(?i)^localhost$")
@@ -164,7 +168,6 @@ func IsBadHost(host string) (bool, net.IP) {
 	}
 	ipList, err := net.LookupIP(host)
 	if err != nil {
-		fmt.Printf("%s %#v\r\n", host, err)
 		return true, nil
 	}
 
