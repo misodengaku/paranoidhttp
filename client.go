@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"time"
 )
@@ -46,13 +47,15 @@ func safeAddr(ctx context.Context, resolver *net.Resolver, hostport string) (str
 
 	ip := net.ParseIP(host)
 	if ip != nil {
-		if isBadIPAddress(ip) {
+		isbad, ip := isBadIPAddress(ip)
+		if isbad {
 			return "", fmt.Errorf("bad ip is detected: %v", ip)
 		}
 		return net.JoinHostPort(ip.String(), port), nil
 	}
 
-	if isBadHost(host) {
+	isbad, ip := IsBadHost(host)
+	if isbad {
 		return "", fmt.Errorf("bad host is detected: %v", host)
 	}
 
@@ -64,12 +67,13 @@ func safeAddr(ctx context.Context, resolver *net.Resolver, hostport string) (str
 	if err != nil || len(addrs) <= 0 {
 		return "", err
 	}
-	for _, addr := range addrs {
-		if isBadIPAddress(addr.IP) {
-			return "", fmt.Errorf("bad ip is detected: %v", addr.IP)
-		}
+	// for _, addr := range addrs {
+	isbad, ip = IsBadHost(addrs[0].String())
+	if isbad {
+		return "", fmt.Errorf("bad ip is detected: %v", ip)
 	}
-	return net.JoinHostPort(addrs[0].IP.String(), port), nil
+	// }
+	return net.JoinHostPort(ip.String(), port), nil
 }
 
 // NewDialer returns a dialer function which only allows IPv4 connections.
@@ -113,62 +117,110 @@ func NewClient() (*http.Client, *http.Transport, *net.Dialer) {
 	}, transport, dialer
 }
 
+func ParanoidGet(urlStr string) (resp *http.Response, err error) {
+	url, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+
+	hostname := url.Host
+	ipaddr := net.ParseIP(url.Host)
+	if ipaddr == nil {
+		// ホスト名がIPアドレスじゃないとき
+		isbad, ip := IsBadHost(url.Host)
+		fmt.Println("aaa", url.Host, ip)
+		if isbad {
+			return nil, fmt.Errorf("Bad host detected.")
+		}
+
+		url.Host = ip.String()
+
+	} else {
+		isbad, _ := isBadIPAddress(ipaddr)
+		if isbad {
+			return nil, fmt.Errorf("Bad IPAddress detected.")
+		}
+	}
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if ipaddr != nil {
+		req.Header.Set("Host", hostname)
+	}
+
+	return DefaultClient.Do(req)
+}
+
 var regLocalhost = regexp.MustCompile("(?i)^localhost$")
 var regHasSpace = regexp.MustCompile("(?i)\\s+")
 
-func isBadHost(host string) bool {
+func IsBadHost(host string) (bool, net.IP) {
 	if regLocalhost.MatchString(host) {
-		return true
+		return true, nil
 	}
 	if regHasSpace.MatchString(host) {
-		return true
+		return true, nil
 	}
-	ipList, _ := net.LookupIP(host)
-	// if err != nil {
-	// 	return true
+	ipList, err := net.LookupIP(host)
+	if err != nil {
+		fmt.Printf("%s %#v\r\n", host, err)
+		return true, nil
+	}
+
+	isbad, ip := isBadIPAddress(ipList[0])
+	if isbad {
+		return true, nil
+	}
+
+	// for i := 0; i < len(ipList); i++ {
+	// 	isbad, ip := isBadIPAddress(ipList[i])
+
+	// 	// 1つでも不正なIPアドレスを含むなら落とす
+	// 	if isbad {
+	// 		return true
+	// 	}
 	// }
 
-	for i := 0; i < len(ipList); i++ {
-		if isBadIPAddress(ipList[i]) {
-			return true
-		}
-	}
-
-	return false
+	return false, ip
 }
 
-func isBadIPAddress(ip net.IP) bool {
-	isbadv4, _ := isBadIPv4(ip)
-	isbadv6, _ := isBadIPv6(ip)
+func isBadIPAddress(ip net.IP) (bool, net.IP) {
+	isbadv4, ip4, _ := isBadIPv4(ip)
+	isbadv6, ip6, _ := isBadIPv6(ip)
 	if isbadv4 || isbadv6 {
-		return true
+		return true, nil
 	}
-	return false
+	if ip4 == nil && ip6 != nil {
+		return false, ip6
+	}
+	return false, ip4
 }
 
-func isBadIPv4(ip net.IP) (bool, error) {
+func isBadIPv4(ip net.IP) (bool, net.IP, error) {
 	if ip.To4() == nil {
-		return false, fmt.Errorf("not IPv4 address")
+		return false, nil, fmt.Errorf("not IPv4 address")
 	}
 
 	if ip.Equal(net.IPv4bcast) || !ip.IsGlobalUnicast() ||
 		netPrivateClassA.Contains(ip) || netPrivateClassB.Contains(ip) || netPrivateClassC.Contains(ip) ||
 		netTestNet.Contains(ip) || netTestNet2.Contains(ip) || netTestNet3.Contains(ip) ||
 		net6To4Relay.Contains(ip) || netISPShared.Contains(ip) || netBenchmark.Contains(ip) {
-		return true, nil
+		return true, nil, nil
 	}
 
-	return false, nil
+	// チェック済みIP返さないとGSLB的なのでランダムに返されたららヤバい
+	return false, ip, nil
 }
 
-func isBadIPv6(ip net.IP) (bool, error) {
+func isBadIPv6(ip net.IP) (bool, net.IP, error) {
 	if ip.To16() == nil {
-		return false, fmt.Errorf("not IPv6 address")
+		return false, nil, fmt.Errorf("not IPv6 address")
 	}
 
 	if !ip.IsGlobalUnicast() {
-		return true, nil
+		return true, nil, nil
 	}
 
-	return false, nil
+	return false, nil, nil
 }

@@ -5,23 +5,27 @@ import (
 	"testing"
 )
 
-func TestRequest(t *testing.T) {
-	_, err := DefaultClient.Get("http://ipv4.google.com")
+func TestParanoidGet(t *testing.T) {
+	_, err := ParanoidGet("http://oomurosakura.co") // IPv4 only
 	if err != nil {
-		t.Error("The request with an ordinal url should be successful")
+		t.Error("The request with an ordinal url should be successful: ", err)
 	}
 
-	_, err = DefaultClient.Get("http://ipv6.google.com")
+	_, err = ParanoidGet("http://ipv6.google.com")
 	if err != nil {
-		t.Log("Warning: If your network supports IPv6, this request should be successful")
+		t.Log("Warning: If your network supports IPv6, this request should be successful", err)
 	}
 
-	_, err = DefaultClient.Get("http://redirect.test.oomurosakura.co") // redirect to 127.0.0.1
+	_, err = ParanoidGet("http://redirect.test.oomurosakura.co") // redirect to 127.0.0.1
 	if err == nil {
-		t.Error("The request with an ordinal url should be successful")
+		t.Error("The request with an ordinal url should be fail")
 	}
 
-	_, err = DefaultClient.Get("http://localhost")
+	_, err = ParanoidGet("http://localhost")
+	if err == nil {
+		t.Errorf("The request for localhost should be fail")
+	}
+	_, err = ParanoidGet("http://127.0.0.1")
 	if err == nil {
 		t.Errorf("The request for localhost should be fail")
 	}
@@ -32,12 +36,13 @@ func TestIsBadHost(t *testing.T) {
 		"localhost",
 		"host has space",
 		"isp-shared.test.oomurosakura.co", // => 100.64.0.1
-		"local.test.oomurosakura.co",      // => 127.0.0.1
+		"localv4.test.oomurosakura.co",    // => 127.0.0.1
 		"localv6.test.oomurosakura.co",    // => ::1
 	}
 
 	for _, h := range badHosts {
-		if !isBadHost(h) {
+		isbad, _ := IsBadHost(h)
+		if !isbad {
 			t.Errorf("%s should be bad", h)
 		}
 	}
@@ -50,7 +55,8 @@ func TestIsBadHost(t *testing.T) {
 	}
 
 	for _, h := range notBadHosts {
-		if isBadHost(h) {
+		isbad, _ := IsBadHost(h)
+		if isbad {
 			t.Errorf("%s should not be bad", h)
 		}
 	}
@@ -76,7 +82,8 @@ func TestIsBadIPAddress(t *testing.T) {
 	}
 
 	for _, ip := range badIPs {
-		if !isBadIPAddress(net.ParseIP(ip)) {
+		isbad, ip := isBadIPAddress(net.ParseIP(ip))
+		if !isbad {
 			t.Errorf("%s should be bad", ip)
 		}
 	}
@@ -95,7 +102,8 @@ func TestIsBadIPAddress(t *testing.T) {
 	}
 
 	for _, ip := range notBadIPs {
-		if isBadIPAddress(net.ParseIP(ip)) {
+		isbad, ip := isBadIPAddress(net.ParseIP(ip))
+		if isbad {
 			t.Errorf("%s should not be bad", ip)
 		}
 	}
